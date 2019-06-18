@@ -1,0 +1,422 @@
+#include<reg52.h>
+#include<lcdp2.h>
+#include<i2c.h>
+
+sbit sw1=P1^0;
+sbit sw2=P1^1;
+sbit sw3=P1^2;
+sbit sw4=P1^3;
+sbit sw5=P1^4;
+sbit sw6=P1^5;
+
+sbit sw7=P1^6; //S1
+sbit sw8=P1^7;	 //52
+
+sbit buz=P0^0;	
+
+int ref,rfe0id,rfe1id,rfe12id,rfe3id,rfe4id,
+unsigned char key;
+unsigned int j=0;
+unsigned char idata buff[20];
+
+code unsigned char get_im_cmd[12]={0xEF,0x01,0xFF,0xFF,0xFF,0xFF,0x01,0x00,0x03,0x01,0x00,0x05};
+code unsigned char generate_ch_cmd[13]={0xEF,0x01,0xFF,0xFF,0xFF,0xFF,0x01,0x00,0x04,0x02,0x01,0x00,0x08};	 
+code unsigned char identify_im_cmd[17]={0xef,0x01,0xff,0xff,0xff,0xff,0x01,0x00,0x08,0x1b,0x01,0x00,0x00,0x01,0x01,0x00,0x27};	 
+
+unsigned char a1=10,a2=20,a3=30,a4=40,a5=50,a6=60,ch=6;
+unsigned char student1,student2,student3,student4,student5,student6;
+
+unsigned int check=0;
+
+void SEND_CHR(unsigned char c);
+void get_im(void);
+void generate_ch(void);
+void identify_im(void);
+
+void FLUSH_BUFF(void)
+{
+	unsigned int i=0;
+	while(i < 20)
+	buff[i++] = 0x00;
+}
+
+void main(void)
+{
+	buz=0;
+
+	SCON = 0x50;
+	TMOD = 0x20;
+	TH1 = 0xFD;
+	TR1 = 1; 
+
+	init_lcd();
+	cmd_lcd(0x01);
+	display_lcd(" FINGER PRINT ");
+	cmd_lcd(0xC0);
+	display_lcd("VOTING MACHINE");
+	delay_ms(500);
+	cmd_lcd(0x01);
+	
+	cmd_lcd(0x01);
+	display_lcd("PRESS S1 TO ");
+	cmd_lcd(0xC0);
+	display_lcd("RESET E.V.M");
+
+	do{
+		if(sw7==0)
+		{
+	
+			write_i2c(0xa0,a1,0);
+			write_i2c(0xa0,a2,0);
+			write_i2c(0xa0,a3,0);
+			write_i2c(0xa0,a4,0);
+			write_i2c(0xa0,a5,0);
+			write_i2c(0xa0,a6,0);
+			cmd_lcd(0x01);
+			display_lcd("E.V.M RESET ");
+			cmd_lcd(0xC0);
+			display_lcd("SUCESSFULLY");
+			delay_ms(500);
+		}
+		check=check+1;
+		delay_ms(3);
+
+	}while(check!=500);
+
+	delay_ms(50);
+	
+	check=0;
+	student1=(read_i2c(0xa0,a1));
+	student2=(read_i2c(0xa0,a2));
+	student3=(read_i2c(0xa0,a3));
+	student4=(read_i2c(0xa0,a4));
+	student5=(read_i2c(0xa0,a5));
+	student6=(read_i2c(0xa0,a6));
+	cmd_lcd(0x01);
+	display_lcd("PRESS S2 F0R ");
+	cmd_lcd(0xC0);
+	display_lcd("TOTAL COUNT");
+		
+	do{
+		if(sw8==0)
+		{
+			cmd_lcd(0x01);
+			display_lcd("CONGRESS = ");
+			integer_lcd(read_i2c(0xa0,a1));
+			cmd_lcd(0xc0);
+			display_lcd("shiv = ");
+			integer_lcd(read_i2c(0xa0,a2));
+			delay_ms(1000);
+			cmd_lcd(0x01);
+			display_lcd("B.J.P = ");
+			integer_lcd(read_i2c(0xa0,a3));
+			cmd_lcd(0xc0);
+			display_lcd("S.S.N = ");
+			integer_lcd(read_i2c(0xa0,a4));
+			delay_ms(1000);
+			cmd_lcd(0x01);
+			display_lcd("N.C.P = ");
+			integer_lcd(read_i2c(0xa0,a5));
+			cmd_lcd(0xc0);
+			display_lcd("NOTA = ");
+			integer_lcd(read_i2c(0xa0,a6));
+		
+			delay_ms(1000);
+		}
+		check=check+1;
+		delay_ms(3);
+	}while(check!=500);
+
+	
+
+	while (1)
+	{
+	  
+	Y:	cmd_lcd(0x01);
+		cmd_lcd(0x80);
+		display_lcd("  PLACE FINGER  ");
+		cmd_lcd(0xC0);
+		display_lcd(" PRESS  switch-1  ");
+		while(sw7==1);
+
+		cmd_lcd(0x01);
+		display_lcd("Identifying...");
+		delay_ms(100);
+
+		delay_ms(25);
+		get_im();
+		delay_ms(750); 
+		delay_ms(250);
+		generate_ch();
+		delay_ms(250);
+		identify_im();
+
+		if(buff[9]==0x00)
+		{
+			cmd_lcd(0x01);                                                
+			display_lcd("Successfully ");
+			cmd_lcd(0xc0);                                                
+			display_lcd("Identified  ");
+			delay_ms(500);
+			cmd_lcd(0x01);
+			display_lcd("User ID: ");
+			key=buff[11];
+			write_lcd(buff[11]/10+48);
+			write_lcd(buff[11]%10+48);			
+			delay_ms(1000);
+
+
+		ref=buff[11]%10+48;
+if(ref==0)
+{
+	
+	if(rfe0id==0)
+	{
+		goto X;
+	}
+	else
+	{
+		cmd_lcd(0x01); 
+		display_lcd(" HELLO USER U R ");
+		cmd_lcd(0xc0);
+		display_lcd(" VOTE completed ");
+		delay_ms(200);		
+		goto Y;
+	}
+		
+		rfe0id=1;
+	
+
+}
+if(ref==1)
+{
+	
+	if(rfe1id==0)
+	{
+		goto X;
+	}
+	else
+	{
+		cmd_lcd(0x01); 
+		display_lcd(" HELLO USER U R ");
+		cmd_lcd(0xc0);
+		display_lcd(" VOTE completed ");
+		delay_ms(200);		
+		goto Y;
+	}
+		
+		rfe1id=1;
+	
+
+}
+if(ref==2)
+{
+	
+	if(rfe2id==0)
+	{
+		goto X;
+	}
+	else
+	{
+		cmd_lcd(0x01); 
+		display_lcd(" HELLO USER U R ");
+		cmd_lcd(0xc0);
+		display_lcd(" VOTE completed ");
+		delay_ms(200);		
+		goto Y;
+	}
+		
+		rfe2id=1;
+	
+
+}
+if(ref==3)
+{
+	
+	if(rfe3id==0)
+	{
+		goto X;
+	}
+	else
+	{
+		cmd_lcd(0x01); 
+		display_lcd(" HELLO USER U R ");
+		cmd_lcd(0xc0);
+		display_lcd(" VOTE completed ");
+		delay_ms(200);		
+		goto Y;
+	}
+		
+		rfe3id=1;
+	
+
+}
+if(ref==4)
+{
+	
+	if(rfe14d==0)
+	{
+		goto X;
+	}
+	else
+	{
+		cmd_lcd(0x01); 
+		display_lcd(" HELLO USER U R ");
+		cmd_lcd(0xc0);
+		display_lcd(" VOTE completed ");
+		delay_ms(200);		
+		goto Y;
+	}
+		
+		rfe14d=1;
+	
+
+}		
+		FLUSH_BUFF();
+								
+	     X: cmd_lcd(0x01); 
+		display_lcd(" HELLO USER     ");
+		cmd_lcd(0xc0);
+		display_lcd(" GIVE U R VOTE  ");
+		delay_ms(200);
+		
+
+		while((sw1==1)&&(sw2==1)&&(sw3==1)&&(sw4==1)&&(sw5==1)&&(sw6==1));
+
+		if(sw1==0)
+		{
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("CONGRESS");
+			buz=1;
+			student1=student1+1;
+			write_i2c(0xa0,a1,student1);
+			delay_ms(1000);
+			buz=0;
+			while(sw1==0);
+		}
+		if(sw2==0)
+		{	
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("Shiv");
+			buz=1;
+			student2=student2+1;
+			write_i2c(0xa0,a2,student2);
+			delay_ms(1000);
+			buz=0;
+			while(sw2==0);		
+		}
+		if(sw3==0)
+		{
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("B.J.P");
+			buz=1;
+			student3=student3+1;
+			write_i2c(0xa0,a3,student3);
+			delay_ms(1000);
+			buz=0;
+			while(sw3==0);
+		}
+		if(sw4==0)
+		{
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("S.S.N");
+			buz=1;
+			student4=student4+1;
+			write_i2c(0xa0,a4,student4);
+			delay_ms(1000);
+			buz=0;
+			while(sw4==0);
+		}
+		if(sw5==0)
+		{ 
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("N.C.P");
+			buz=1;
+			student5=student5+1;
+			write_i2c(0xa0,a5,student5);
+			delay_ms(1000);
+			buz=0;
+			while(sw5==0);
+		}
+		if(sw6==0)
+		{
+			cmd_lcd(0x01);
+			display_lcd("YOU HAVE ELECTED");
+			cmd_lcd(0xC0);
+			display_lcd("NOTA");
+			buz=1;
+			student6=student6+1;
+			write_i2c(0xa0,a6,student6);
+			delay_ms(1000);
+			buz=0;
+			while(sw6==0);
+		}
+	}
+	else
+	{
+	
+		cmd_lcd(0x01);
+		display_lcd("  Not Identify  ");
+		cmd_lcd(0xC0);
+		display_lcd("                ");
+		buz=1;
+		delay_ms(1000);
+		buz=0;
+		
+	}
+		
+}
+}
+void identify_im(void)
+{
+	unsigned char i;
+	FLUSH_BUFF();
+	RI=0;TI=0;
+	delay_ms(5);
+
+	for(i=0;i<17;i++)
+	{
+		SEND_CHR(identify_im_cmd[i]);
+	}
+	for(j=0;j<12;j++)
+	{
+		while(RI==0);
+		buff[j]=SBUF;
+		RI=0;
+	}	
+}
+
+
+void generate_ch(void)
+{
+	for(j=0;j<13;j++)
+	{
+		SEND_CHR(generate_ch_cmd[j]);
+	}
+	delay_ms(250);
+
+}
+void get_im(void)
+{
+	for(j=0;j<12;j++)
+	{
+		SEND_CHR(get_im_cmd[j]);
+	}
+	delay_ms(250);
+}
+void SEND_CHR(unsigned char c)
+{
+	SBUF = c;
+	while(TI==0);
+	TI=0;
+}					 
